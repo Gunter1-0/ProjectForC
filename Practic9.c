@@ -105,11 +105,11 @@ void StartChild(pid_t pid, bool *flag)
 	pid_t s = waitpid(pid, &status, 0);
 	if (s == -1)
 	{
-		printf("\n114 %s",strerror(errno));
+		printf("\n108 %s",strerror(errno));
 	}
 	else if(s >= 0)
 	{
-		if(!WIFEXITED(status))printf("\n119 Status= %d %s\n",status, strerror(errno));
+		if(!WIFEXITED(status))printf("\n112 Status= %d %s\n",status, strerror(errno));
 	}
 
 }
@@ -195,7 +195,7 @@ int main(void)
 						Child->forkFlag3 = true;
 						Child->forkFlag4 = true;
 						DIR *directory = opendir(Way);//Открывает файл для читения
-						if (directory == NULL) printf("\n60 %s",strerror(errno));//Проверка на то, что хватило памяти для названия репозитория
+						if (directory == NULL) printf("\n198 %s",strerror(errno));//Проверка на то, что хватило памяти для названия репозитория
 						else
 						{
 							while ((DirBox = readdir(directory)) != NULL)//проверка на конец файла
@@ -205,11 +205,11 @@ int main(void)
 								char *Str = calloc(strlen(Way)+strlen(name)+2,1);
 								char *Str1 = calloc(strlen(Way)+3,1);
 
-								if(Str1 == NULL)printf("70 Memory overflov");
+								if(Str1 == NULL)printf("208 Memory overflov");
 								else
 								{
 									char *Str2 = calloc(strlen(Way)+4,1);//выделенная память
-									if(Str2 == NULL)printf("74 Memory overflov");
+									if(Str2 == NULL)printf("212 Memory overflov");
 									else
 									{
 										strcpy(Str,Way);
@@ -249,56 +249,56 @@ int main(void)
 													if((stopflag3)&&(pid2 > 0)){ stopflag3 = false; pid3 = fork(); num = 3;}
 													if((stopflag4)&&(pid3 > 0)){ stopflag4 = false; pid4 = fork(); num = 4;}
 													pid_t p = ChoisePid(num, pid1, pid2 , pid3, pid4);
-													printf("\nPID = %d, num = %d\n", p, num);													
+													printf("\n252 PID = %d, num = %d\n", p, num);													
 													if(p > 0)
 													{
 														//Parent
-														printf("\nparent PID = %d num = %d\n", getpid(), num);													
-														printf("\n255 Hello Nina %s\n", Str);
+														printf("\n256 parent PID = %d num = %d\n", getpid(), num);													
+														printf("\n257 parent write Way in List %s\n", Str);
 														Head = addFilename(Head, Str);														
-														printf("\n257 Hello Natasha\n");
+														printf("\n259 Write Finish\n");
 													}
 													else if(p == 0)
 													{
 														//Child
-														printf("\nchild PID = %d num = %d\n", getpid(), num);													
-														printf("\n267 Bool %d %d %d %d \n",Child->forkFlag1,Child->forkFlag2,Child->forkFlag3,Child->forkFlag4);
-												
-														printf("\n261 Hello Lena\n");
+														printf("\n264 child PID = %d num = %d\n", getpid(), num);													
+														printf("\n265 Bool %d %d %d %d \n",Child->forkFlag1,Child->forkFlag2,Child->forkFlag3,Child->forkFlag4);												
+														printf("\n266 Start child\n");
 														if(ChoiseFlag(num, Child->forkFlag1, Child->forkFlag2, Child->forkFlag3, Child->forkFlag4))
 														{
-															printf("\n267 Bool %d %d %d %d \n",Child->forkFlag1,Child->forkFlag2,Child->forkFlag3,Child->forkFlag4);
-															ChangeFlagToFalse(num, &Child->forkFlag1, &Child->forkFlag2, &Child->forkFlag3, &Child->forkFlag4);
+															printf("\n269 Bool %d %d %d %d \n",Child->forkFlag1,Child->forkFlag2,Child->forkFlag3,Child->forkFlag4);
+															//ChangeFlagToFalse(num, &Child->forkFlag1, &Child->forkFlag2, &Child->forkFlag3, &Child->forkFlag4);
 															if(sem_wait(main_sem) == 0)//Семафор не работает
 															{
 																// Потомок
 																count = 0;
 																strcpy(Way, Head->file);
-																printf("\n275 %s\n", Way);
+																printf("\n276 %s\n", Head->file);
 																directory = opendir(Way);
-																if (directory == NULL) printf("\n141 %s",strerror(errno));
+																ChangeFlagToFalse(num, &Child->forkFlag1, &Child->forkFlag2, &Child->forkFlag3, &Child->forkFlag4);
+																if (directory == NULL) printf("\n279 %s",strerror(errno));
 
 															}
-															else printf("\n147 sem_wait %s",strerror(errno));
+															else printf("\n282 sem_wait %s",strerror(errno));
 
 														}
 														else
 														{
 															//Нужно организовать передачу пути
-															printf("\n281 ERROR POINT \n");
+															printf("\n288 Start of creating in share memory\n");
 															strcpy(Child->Name, Str);
 															Child->IsNameSet = true;
-															printf("\n284 ERROR POINT \n");
+															printf("\n291 End of creating in share memory\n");
 														}
 
 													}
-													else if((p == -1)&&(errno != 0)) printf("\n162 ERROR: %s",strerror(errno));
+													else if((p == -1)&&(errno != 0)) printf("\n295 ERROR: %s",strerror(errno));
 
 												}
-												else if((Str1 == NULL)||(Str2 == NULL)) printf("\n167 Memory overflov");
+												else if((Str1 == NULL)||(Str2 == NULL)) printf("\n298 Memory overflov");
 
 											}
-											else if(errno) printf("\n170 %s %s",strerror(errno), Str);
+											else if(errno) printf("\n301 %s %s",strerror(errno), Str);
 
 											free(Str);
 										}
@@ -308,104 +308,100 @@ int main(void)
 								}
 
 							}
-							if (errno) printf("\n305 %s %s PID = %d num = %d",strerror(errno), Way, getpid(), num);
+							if (errno) printf("\n311 %s %s PID = %d num = %d",strerror(errno), Way, getpid(), num);
 							closedir(directory);
-							printf("\n304 Hello, Fread\n");
-							if(ChoisePid(num, pid1, pid2 , pid3, pid4) > 0)
+							printf("\n313 End Of process\n");
+							pid_t pidt = ChoisePid(num, pid1, pid2 , pid3, pid4); 
+							if(pidt > 0)
 							{
-								printf("\n307 Hello, Mike\n");
+								printf("\n317 Start of use of List\n");
 								while (Head != NULL)
 								{
 									//printf("\n310 Bool %d %d %d %d \n",Child->forkFlag1,Child->forkFlag2,Child->forkFlag3,Child->forkFlag4);
 									//printf("\n318 %s\n", Head->file);
 									if(Child->forkFlag1||Child->forkFlag2||Child->forkFlag3||Child->forkFlag4)
 									{
-										printf("\n313 Hello, Mari\n");
+										printf("\n324 Process is free\n");
 										if((pid1 > 0)&&(Child->forkFlag1))
 										{						
-											printf("\n316 Hello, Dana\n");
+											printf("\n327 First process Start\n");
 											StartChild(pid1, &Child->forkFlag1);
 											Head = delBegin(Head);
 										}
 										if((pid2 > 0)&&(Child->forkFlag2))
 										{
-											printf("\n322 Hello, Juli\n");
+											printf("\n333 Second process Start\n");
 											StartChild(pid2, &Child->forkFlag2);
 											Head = delBegin(Head);
 										}
 										if((pid3 > 0)&&(Child->forkFlag3))
 										{ 
-											printf("\n328 Hello, Anjela\n");
+											printf("\n339 Third process Start\n");
 											StartChild(pid3, &Child->forkFlag3);
 											Head = delBegin(Head);
 										}
 										if((pid4 > 0)&&(Child->forkFlag4))
 										{
-											printf("\n334 Hello, Stasy\n");
+											printf("\n345 Fourth process Start\n");
 											StartChild(pid4, &Child->forkFlag4);
 											Head = delBegin(Head);
 										}
 									}									
 									if(Child->IsNameSet)
 									{
-										printf("\n318 ERROR POINT %s\n", Child->Name );
+										printf("\n352 Child->Name %s\n", Child->Name );
 										Head = addFilename(Head, Child->Name);
 										Child->IsNameSet = false;
-										printf("\n321 ERROR POINT \n");
+										printf("\n355 Finish of creating \n");
 
 									}
 									
 								}
-
+								if(Child->count != 0) count+=Child->count;	
 							}
-
-							if(ChoisePid(num, pid1, pid2 , pid3, pid4) == 0)//Fix a parent process
+							else if(pidt == 0)//Fix a parent process
 							{
 								Child->count += count;
 								ChangeFlagToTrue(num, &Child->forkFlag1, &Child->forkFlag2, &Child->forkFlag3, &Child->forkFlag4);
 							}
-							else if((ChoisePid(num, pid1, pid2 , pid3, pid4)>0)&&(Child->count != 0))
- 							{
-								count+=Child->count;
-							}
-
-							if(sem_post(main_sem)!=0) printf("\n189 sem_post in parent %s\n", strerror(errno));
+						 	
+							if(sem_post(main_sem)!=0) printf("\n368 sem_post in parent %s\n", strerror(errno));
 
 						}
 						//Все освобождаем
 						if (sem_close(main_sem) != 0)
 						{
-							printf("\n195 sem_close %s\n",strerror(errno));
+							printf("\n374 sem_close %s\n",strerror(errno));
 						}
 
 					}
 					else
 					{
-						printf("\n201 sem_wait %s",strerror(errno));
+						printf("\n380 sem_wait %s",strerror(errno));
 					}
 
 
 				}
 				else
 				{
-					printf("\n208 sem_open %s\n",strerror(errno));
+					printf("\n387 sem_open %s\n",strerror(errno));
 				}
 
 				//Все освобождаем
-				if(munmap(adr, SIZE_STRUCT) != 0&&(pid>0)) printf("\n212 munmap = %s", strerror(errno));
-				if(close(Space) != 0&&(pid>0))printf("\n213 close = %s", strerror(errno));
-				if(shm_unlink(SHMNAME)&&(pid>0))printf("\n214 unlink = %s PID = %d", strerror(errno), pid);
+				if(munmap(adr, SIZE_STRUCT) != 0&&(pid>0)) printf("\n391 munmap = %s", strerror(errno));
+				if(close(Space) != 0&&(pid>0))printf("\n392 close = %s", strerror(errno));
+				if(shm_unlink(SHMNAME)&&(pid>0))printf("\n393 unlink = %s PID = %d", strerror(errno), pid);
 
 			}
 			else
 			{
-				printf("\n218 mmap %s\n",strerror(errno));
+				printf("\n398 mmap %s\n",strerror(errno));
 			}
 
 		}
 		else
 		{
-			printf("\n224 mmap %s\n",strerror(errno));
+			printf("\n404 mmap %s\n",strerror(errno));
 		}
 
 	}
