@@ -15,30 +15,41 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 
+
 struct ListOfFile
 {
-	char Name[4096];
-	int count;
-	bool forkFlag1;
-	bool forkFlag2;
-	bool forkFlag3;
-	bool forkFlag4;
-	bool IsNameSet;
+	int count1;			//Количество файлов, посчитанных в первом процессе.
+	int count2;			//Количество файлов, посчитанных во втором процессе.
+	int count3;			//Количество файлов, посчитанных в третьемм процессе.
+	int count4;			//Количество файлов, посчитанных в четвёртом процессе.
+	char Out1[4096];	//Строка для передачи пути из дочернего процесса в родительский.
+	char Out2[4096];	//Строка для передачи пути из дочернего процесса в родительский.
+	char Out3[4096];	//Строка для передачи пути из дочернего процесса в родительский.
+	char Out4[4096];	//Строка для передачи пути из дочернего процесса в родительский.
+	bool IsEnd1;		//Флаг конца работы первого процесса.
+	bool IsEnd2;		//Флаг конца работы второго процесса.
+	bool IsEnd3;		//Флаг конца работы третьего процесса.
+	bool IsEnd4;		//Флаг конца работы четвертого процесса.
+	bool IsSet1;		//Флаг заполнения строки OUT1.
+	bool IsSet2;		//Флаг заполнения строки OUT2.
+	bool IsSet3;		//Флаг заполнения строки OUT3.
+	bool IsSet4;		//Флаг заполнения строки OUT4.
+	int ps;				//Количество задействованных процессов.
 };
 
-#define SHMNAME "/OURE_SPACE"
-#define SEMNAME "/OURE_SEM"
-#define SIZE_INT sizeof(int)
-#define SIZE_STRUCT sizeof(struct ListOfFile)
-
-struct List //Список с папками
+struct List 			//Структура для списков с путями.
 {
 	char file [4096];
 	struct List *next;
 };
 
-struct List *Init(char file[4096])
+#define SHMNAME "/OURE_SPACE"				 //Название участка разделяемой памяти.
+#define SEMNAME "/OURE_SEM"					 //Название семафора
+#define SIZE_STRUCT sizeof(struct ListOfFile)//Размер основной (первой) структуры 
+
+struct List *Init(char file[4096])			
 {
+	//Создание начала списка с папками
 	struct List *newEl;
 	newEl = (struct List*)malloc(sizeof(struct List));
 	if(newEl != NULL)
@@ -50,31 +61,30 @@ struct List *Init(char file[4096])
 	return newEl;
 }
 
-struct List *addFilename(struct List* Files, char file[4096])
+struct List* addFilename(struct List* Files, char file[4096])
 {
-		if(Files != NULL)
+	//Добавление элементов в список или создание списка
+	if(Files != NULL)
+	{
+		struct List *newEl, *point = Files;
+		newEl = (struct List*)malloc(sizeof(struct List));
+		if(newEl != NULL)
 		{
-			struct List *newEl, *point = Files;
-			newEl = (struct List*)malloc(sizeof(struct List));
-			if(newEl != NULL)
-			{
-
-				strcpy(newEl->file, file);
-				newEl->next = NULL;
-				while(point->next != NULL)point = point->next;
-				point->next = newEl;
-			}
-			else printf("\n69 %s",strerror(errno));
-
+			strcpy(newEl->file, file);
+			newEl->next = NULL;
+			while(point->next != NULL)point = point->next;
+			point->next = newEl;
 		}
-		else Files = Init(file);
-
+		else printf("\n77 %s",strerror(errno));
+	}
+	else Files = Init(file);
 
 	return Files;
 }
 
 struct List *delBegin(struct List* List)
 {
+	//Удаление начального элемента из списка
     struct List *p = List;
     if(List != NULL)
     {
@@ -92,86 +102,138 @@ struct List *delBegin(struct List* List)
     }
     else
     {
-        printf("\n79 ERROR: %s\n", strerror(errno));
+        return List;
     }
 
 	return List;
 }
 
-void StartChild(pid_t pid, bool *flag)
+struct ListOfFile* InitCildStruct(struct ListOfFile* ChildStruct)
 {
-	*flag = false;
-	int status;
-	pid_t s = waitpid(pid, &status, 0);
-	if (s == -1)
-	{
-		printf("\n108 %s",strerror(errno));
-	}
-	else if(s >= 0)
-	{
-		if(!WIFEXITED(status))printf("\n112 Status= %d %s\n",status, strerror(errno));
-	}
-
+	//Начальные значения основной структуры
+	ChildStruct->count1 = 0;
+	ChildStruct->count2 = 0;
+	ChildStruct->count3 = 0;
+	ChildStruct->count4 = 0;
+	ChildStruct->ps = 0;
+	ChildStruct->IsEnd1 = true;
+	ChildStruct->IsEnd2 = true;
+	ChildStruct->IsEnd3 = true;
+	ChildStruct->IsEnd4 = true;
+	ChildStruct->IsSet1 = false;
+	ChildStruct->IsSet2 = false;
+	ChildStruct->IsSet3 = false;
+	ChildStruct->IsSet4 = false;
+	return ChildStruct;	
 }
 
-bool ChoiseFlag(int num, bool flag1, bool flag2, bool flag3, bool flag4)
+//Основная функция.
+//Обработка папок и заполнения списка с папками.
+//Функция возвращает заполненный список с папками
+//и количество посчитанных файлов размером больше 5 Кб.
+struct List* FindeFile(char Way[4095], struct List* LocalList, int *count)
 {
-	if(num == 1) return flag1;
-	else if(num == 2) return flag2;
-	else if(num == 3) return flag3;
-	else if(num == 4) return flag4;	
-}
-
-void ChangeFlagToFalse(int num, bool *flag1, bool *flag2, bool *flag3, bool *flag4)
-{
-	if(num == 1) *flag1 = false;
-	else if(num == 2) *flag2 = false;
-	else if(num == 3) *flag3 = false;
-	else if(num == 4) *flag4 = false;
-}
-
-void ChangeFlagToTrue(int num, bool *flag1, bool *flag2, bool *flag3, bool *flag4)
-{
-	if(num == 1) *flag1 = true;
-	else if(num == 2) *flag2 = true;
-	else if(num == 3) *flag3 = true;
-	else if(num == 4) *flag4 = true;
-}
-
-
-pid_t ChoisePid(int num, pid_t pid1, pid_t pid2, pid_t pid3, pid_t pid4)
-{
-	if(num == 1) return pid1;
-	else if(num == 2) return pid2;
-	else if(num == 3) return pid3;
-	else if(num == 4) return pid4;
-	else if(pid1>0&&pid2>0&&pid3>0&&pid4>0) return getpid();
-}
-
-int main(void)
-{
-	char Way[4095] = "/home/lenovo/Desktop/Колледж/EXD";// основная папка
-	int count = 0;
 	errno = 0; 			   			 //Глобальная переменная, в которую записывается номер ошибки
 	struct dirent* DirBox; 			 //Структура, в которую записывается считанная информация
 	char* name;			   			 //Название файла, которое мы извлекаем из  DirBox
 	struct stat buf;	   			 //Информация о файле/каталоге
     int FileSize;             		 //Размер файла
- 	pid_t pid = getpid();
-	pid_t pid1;
- 	pid_t pid2;
- 	pid_t pid3;
- 	pid_t pid4;
-	bool stopflag1 = true;
-	bool stopflag2 = true;
-	bool stopflag3 = true;
-	bool stopflag4 = true;
-	struct List *Head = NULL;
-	int num = 0;
+	
+		DIR *directory = opendir(Way);//Открывает файл для читения
+		if (directory == NULL) printf("\nMemory overflov %s",strerror(errno));//Проверка на то, что хватило памяти для названия репозитория
+		else
+		{
+			while ((DirBox = readdir(directory)) != NULL)//проверка на конец файла
+			{
+				name = DirBox -> d_name;
+				char *Str = calloc(strlen(Way)+strlen(name)+2,1);
+				char *Str1 = calloc(strlen(Way)+3,1);
+
+				if(Str1 == NULL)printf("\nMemory overflov\n");
+				else
+				{
+					char *Str2 = calloc(strlen(Way)+4,1);//выделенная память
+					if(Str2 == NULL)printf("\nMemory overflov\n");
+					else
+					{
+						strcpy(Str,Way);
+						strcat(Str,"/");
+						strcat(Str,name);
+
+						strcpy(Str1,Way);
+						strcat(Str1,"/");
+						strcat(Str1,".");
+
+						strcpy(Str2,Way);
+						strcat(Str2,"/");
+						strcat(Str2,"..");
+
+						if (Str == NULL) printf("\nMemory overflov\n");
+						else
+						{
+							if(stat(Str,&buf) == 0)
+							{
+								if(S_ISREG(buf.st_mode))
+								{
+									//This is file
+									FileSize = buf.st_size/1024;
+									if(FileSize > 5)
+									{
+										printf("Name: %s Size(Kb)%d\n", name, FileSize);
+										(*count)++;
+									}
+
+								}
+								else if((S_ISDIR(buf.st_mode) !=0)&&(strcmp(Str,Str1) != 0)&&(strcmp(Str,Str2) != 0)&&(Str1 != NULL)&&(Str2 != NULL))
+								{
+									//This is directory
+									LocalList = addFilename(LocalList,Str);									
+								}
+								else if((Str1 == NULL)||(Str2 == NULL)) printf("\n Memory overflov");
+
+							}
+							else if(errno) printf("\n %s %s",strerror(errno), Str);
+
+							free(Str);
+
+						}
+						free(Str2);
+					}
+					free(Str1);
+				}
+			}
+			if (errno) printf("\n %s %s PID = %d",strerror(errno), Way, getpid());
+			closedir(directory);
+			printf("\nocunt in func = %d\n", *count);	 
+		}		
+
+	return LocalList;
+}
+
+bool Condition(int ps, pid_t pid1, pid_t pid2, pid_t pid3, pid_t pid4)
+{
+	//Проверка идентификаторов порождённх процессов в зависимости от их количества.
+	if(ps == 1) return pid1>0;
+	else if(ps == 2) return pid1>0&&pid2>0;
+	else if(ps == 3) return pid1>0&&pid2>0&&pid3>0;
+	else if(ps == 4) return pid1>0&&pid2>0&&pid3>0&&pid4>0;
+	else if(ps == 0) return true;
+	else false;	
+}
+
+int main(void)
+{
+	char Way[4095] = "/home/lenovo/Desktop/Колледж/EXD";//Основная папка
+	char Way1[4095],Way2[4095],Way3[4095],Way4[4095]; 	//Путь к папке для процесса
+	int num = 0;										//Номер процесса
+	int count = 0;										//Количество файлов
+	errno = 0; 			   			 					//Глобальная переменная, в которую записывается номер ошибки
 	int Space = shm_open(SHMNAME, O_CREAT|O_RDWR,0600);	//Общая память
-	if(Space < 0) printf("\n42 shm_open %s \n", strerror(errno));
+	struct List *Parent = NULL;							//Основной списсок с папками в родительском процессе
+	pid_t pid1, pid2, pid3, pid4;						//Идентификаторы процессов 
+	if(Space < 0) printf("\n shm_open %s \n", strerror(errno));
 	else
-	{
+	{ 
 		//Выделяем память
 		if(ftruncate(Space,SIZE_STRUCT) == 0)
 		{
@@ -180,253 +242,214 @@ int main(void)
 			if(adr != MAP_FAILED)
 			{
 				struct ListOfFile *Child = (struct ListOfFile *) adr;
-				sem_t* main_sem = sem_open(SEMNAME, O_CREAT,0600,5);
+				sem_t* main_sem = sem_open(SEMNAME, O_CREAT,0666,5);
 				if(main_sem != SEM_FAILED)
 				{
-					printf("\nHello\n");
-					if(sem_wait(main_sem) == 0)
+					Child = InitCildStruct(Child);//Заполнение структуры
+					//Основная работа
+					
+					//Первый проход по корневой папке
+					if(sem_wait(main_sem) == 0) Parent = FindeFile(Way, Parent, &count);
+					else printf("\n sem_wait %s",strerror(errno));
+					
+					//Обработка списка с процессами
+					while(Parent != NULL)
 					{
-						printf("\nBey\n");
-						//Основная работа
-						Child->count = 0;
-						Child->IsNameSet = false;
-						Child->forkFlag1 = true;
-						Child->forkFlag2 = true;
-						Child->forkFlag3 = true;
-						Child->forkFlag4 = true;
-						DIR *directory = opendir(Way);//Открывает файл для читения
-						if (directory == NULL) printf("\n198 %s",strerror(errno));//Проверка на то, что хватило памяти для названия репозитория
-						else
+						//Порождение новых процессов для каждой папки
+						if(Parent != NULL&&Child->IsEnd1&&Condition(Child->ps, pid1, pid2, pid3, pid4))
 						{
-							while ((DirBox = readdir(directory)) != NULL)//проверка на конец файла
-							{
-
-								name = DirBox -> d_name;
-								char *Str = calloc(strlen(Way)+strlen(name)+2,1);
-								char *Str1 = calloc(strlen(Way)+3,1);
-
-								if(Str1 == NULL)printf("208 Memory overflov");
-								else
-								{
-									char *Str2 = calloc(strlen(Way)+4,1);//выделенная память
-									if(Str2 == NULL)printf("212 Memory overflov");
-									else
-									{
-										strcpy(Str,Way);
-										strcat(Str,"/");
-										strcat(Str,name);
-
-										strcpy(Str1,Way);
-										strcat(Str1,"/");
-										strcat(Str1,".");
-
-										strcpy(Str2,Way);
-										strcat(Str2,"/");
-										strcat(Str2,"..");
-
-										if (Str == NULL) printf("89 Memory overflov");
-										else
-										{
-											if(stat(Str,&buf) == 0)
-											{
-												if(S_ISREG(buf.st_mode))
-												{
-													//This is file
-													FileSize = buf.st_size/1024;
-													if(FileSize > 5)
-													{
-														printf("Name: %s Size(Kb)%d\n", name, FileSize);
-														count++;
-
-													}
-
-												}
-												else if((S_ISDIR(buf.st_mode) !=0)&&(strcmp(Str,Str1) != 0)&&(strcmp(Str,Str2) != 0)&&(Str1 != NULL)&&(Str2 != NULL))
-												{
-													//идентификатор процесса или группы процессов
-													if(stopflag1){ stopflag1 = false; pid1 = fork(); num = 1;}
-													if((stopflag2)&&(pid1 > 0)){ stopflag2 = false; pid2 = fork(); num = 2;}
-													if((stopflag3)&&(pid2 > 0)){ stopflag3 = false; pid3 = fork(); num = 3;}
-													if((stopflag4)&&(pid3 > 0)){ stopflag4 = false; pid4 = fork(); num = 4;}
-													pid_t p = ChoisePid(num, pid1, pid2 , pid3, pid4);
-													printf("\n252 PID = %d, num = %d\n", p, num);													
-													if(p > 0)
-													{
-														//Parent
-														printf("\n256 parent PID = %d num = %d\n", getpid(), num);													
-														printf("\n257 parent write Way in List %s\n", Str);
-														Head = addFilename(Head, Str);														
-														printf("\n259 Write Finish\n");
-													}
-													else if(p == 0)
-													{
-														//Child
-														printf("\n264 child PID = %d num = %d\n", getpid(), num);													
-														printf("\n265 Bool %d %d %d %d \n",Child->forkFlag1,Child->forkFlag2,Child->forkFlag3,Child->forkFlag4);												
-														printf("\n266 Start child\n");
-														if(ChoiseFlag(num, Child->forkFlag1, Child->forkFlag2, Child->forkFlag3, Child->forkFlag4))
-														{
-															printf("\n269 Bool %d %d %d %d \n",Child->forkFlag1,Child->forkFlag2,Child->forkFlag3,Child->forkFlag4);
-															//ChangeFlagToFalse(num, &Child->forkFlag1, &Child->forkFlag2, &Child->forkFlag3, &Child->forkFlag4);
-															if(sem_wait(main_sem) == 0)//Семафор не работает
-															{
-																// Потомок
-																count = 0;
-																strcpy(Way, Head->file);
-																printf("\n276 %s\n", Head->file);
-																directory = opendir(Way);
-																ChangeFlagToFalse(num, &Child->forkFlag1, &Child->forkFlag2, &Child->forkFlag3, &Child->forkFlag4);
-																if (directory == NULL) printf("\n279 %s",strerror(errno));
-
-															}
-															else printf("\n282 sem_wait %s",strerror(errno));
-
-														}
-														else
-														{
-															//Нужно организовать передачу пути
-															printf("\n288 Start of creating in share memory\n");
-															strcpy(Child->Name, Str);
-															Child->IsNameSet = true;
-															printf("\n291 End of creating in share memory\n");
-														}
-
-													}
-													else if((p == -1)&&(errno != 0)) printf("\n295 ERROR: %s",strerror(errno));
-
-												}
-												else if((Str1 == NULL)||(Str2 == NULL)) printf("\n298 Memory overflov");
-
-											}
-											else if(errno) printf("\n301 %s %s",strerror(errno), Str);
-
-											free(Str);
-										}
-										free(Str2);
-									}
-									free(Str1);
-								}
-
-							}
-							if (errno) printf("\n311 %s %s PID = %d num = %d",strerror(errno), Way, getpid(), num);
-							closedir(directory);
-							printf("\n313 End Of process\n");
-							pid_t pidt = ChoisePid(num, pid1, pid2 , pid3, pid4); 
-							if(pidt > 0)
-							{
-								printf("\n317 Start of use of List\n");
-								while (Head != NULL)
-								{
-									//printf("\n310 Bool %d %d %d %d \n",Child->forkFlag1,Child->forkFlag2,Child->forkFlag3,Child->forkFlag4);
-									//printf("\n318 %s\n", Head->file);
-									if(Child->forkFlag1||Child->forkFlag2||Child->forkFlag3||Child->forkFlag4)
-									{
-										printf("\n324 Process is free\n");
-										if((pid1 > 0)&&(Child->forkFlag1))
-										{						
-											printf("\n327 First process Start\n");
-											StartChild(pid1, &Child->forkFlag1);
-											Head = delBegin(Head);
-										}
-										if((pid2 > 0)&&(Child->forkFlag2))
-										{
-											printf("\n333 Second process Start\n");
-											StartChild(pid2, &Child->forkFlag2);
-											Head = delBegin(Head);
-										}
-										if((pid3 > 0)&&(Child->forkFlag3))
-										{ 
-											printf("\n339 Third process Start\n");
-											StartChild(pid3, &Child->forkFlag3);
-											Head = delBegin(Head);
-										}
-										if((pid4 > 0)&&(Child->forkFlag4))
-										{
-											printf("\n345 Fourth process Start\n");
-											StartChild(pid4, &Child->forkFlag4);
-											Head = delBegin(Head);
-										}
-									}									
-									if(Child->IsNameSet)
-									{
-										printf("\n352 Child->Name %s\n", Child->Name );
-										Head = addFilename(Head, Child->Name);
-										Child->IsNameSet = false;
-										printf("\n355 Finish of creating \n");
-
-									}
-									
-								}
-								if(Child->count != 0) count+=Child->count;	
-							}
-							else if(pidt == 0)//Fix a parent process
-							{
-								Child->count += count;
-								ChangeFlagToTrue(num, &Child->forkFlag1, &Child->forkFlag2, &Child->forkFlag3, &Child->forkFlag4);
-							}
-						 	
-							if(sem_post(main_sem)!=0) printf("\n368 sem_post in parent %s\n", strerror(errno));
-
+							Child->ps++;
+							Child->IsEnd1 = false;
+							strcpy(Way1, Parent->file);
+							Parent = delBegin(Parent);
+							pid1 = fork();
+							num = 1;
 						}
-						//Все освобождаем
-						if (sem_close(main_sem) != 0)
+						if(Parent != NULL&&Child->IsEnd2&&Condition(Child->ps, pid1, pid2, pid3, pid4))
 						{
-							printf("\n374 sem_close %s\n",strerror(errno));
+							Child->ps++;
+							Child->IsEnd2 = false;
+							strcpy(Way2, Parent->file);
+							Parent = delBegin(Parent);
+							pid2 = fork();
+							num = 2;
 						}
-
+						if(Parent != NULL&&Child->IsEnd3&&Condition(Child->ps, pid1, pid2, pid3, pid4))
+						{
+							Child->ps++;
+							Child->IsEnd3 = false;
+							strcpy(Way3, Parent->file);
+							Parent = delBegin(Parent);
+							pid3 = fork();
+							num = 3; 
+						}
+						if(Parent != NULL&&Child->IsEnd4&&Condition(Child->ps, pid1, pid2, pid3, pid4))
+						{
+							Child->ps++;
+							Child->IsEnd4 = false;
+							strcpy(Way4, Parent->file);
+							Parent = delBegin(Parent);
+							pid4 = fork();
+							num = 4; 
+						}
+						
+						if(Condition(Child->ps, pid1, pid2, pid3, pid4))
+						{							
+							//Parent process
+							//Получаем из дочерних процессов пути к папкам
+							while (!Child->IsEnd1||!Child->IsEnd2||!Child->IsEnd3||!Child->IsEnd4)
+							{
+								if(Child->IsSet1)
+								{
+									Parent = addFilename(Parent,Child->Out1);								
+									Child->IsSet1 = false;
+								}
+								if(Child->IsSet2)
+								{
+									Parent = addFilename(Parent,Child->Out2);								
+									Child->IsSet2 = false;
+								}
+								if(Child->IsSet3)
+								{
+									Parent = addFilename(Parent,Child->Out3);								
+									Child->IsSet3 = false;
+								}
+								if(Child->IsSet4)
+								{
+									Parent = addFilename(Parent,Child->Out4);								
+									Child->IsSet4 = false;
+								}
+		
+							}
+								
+						}
+						else if(pid1 == -1||pid2 == -1||pid3 == -1||pid4 == -1) 
+						{
+							//ERROR
+							//Обработка ошибок
+							printf("\nFork ERROR: %s",strerror(errno));
+						}
+						else if(pid1 == 0||pid2 == 0||pid3 == 0||pid4 == 0)
+						{
+							//Child process
+							//Обработка папок в дочерних процессах. 
+							//Подсчет общего количества файлов в каждом процессе.
+							if(num == 1)
+							{
+								struct List *First = NULL;
+								int fs1 = Child->count1;
+								if(sem_wait(main_sem) == 0) First = FindeFile(Way1, First, &fs1);
+								else printf("\n sem_wait %s",strerror(errno));
+								Child->count1 =fs1;
+								printf("\ncount1 = %d ps = %d\n",Child->count1, fs1);
+								while (First!=NULL)
+								{
+									if(!Child->IsSet1)
+									{
+										strcpy(Child->Out1,First->file);
+										Child->IsSet1 = true;
+										First = delBegin(First);
+									}
+								
+								}
+								Child->IsEnd1 = true;
+							} 
+							else if(num == 2)
+							{
+								struct List *Second = NULL;
+								int fs2 = Child->count2;
+								if(sem_wait(main_sem) == 0) Second = FindeFile(Way2, Second, &fs2);
+								else printf("\n sem_wait %s",strerror(errno));
+								Child->count2 = fs2;
+								printf("\ncount2 = %d ps = %d\n",Child->count2, fs2);
+								while (Second!=NULL)
+								{
+									if(!Child->IsSet2)
+									{
+										strcpy(Child->Out2,Second->file);
+										Child->IsSet2 = true;
+										Second = delBegin(Second);
+									}
+								}
+								Child->IsEnd2 = true;
+							}
+							else if(num == 3)
+							{
+								struct List *Third = NULL;
+								int fs3 = Child->count3;
+								if(sem_wait(main_sem) == 0) Third = FindeFile(Way3, Third, &fs3);
+								else printf("\n sem_wait %s",strerror(errno));
+								Child->count3 = fs3;
+								printf("\ncount3 = %d ps = %d\n",Child->count3, fs3);
+								while (Third!=NULL)
+								{
+									if(!Child->IsSet3)
+									{
+										strcpy(Child->Out3,Third->file);
+										Child->IsSet3 = true;
+										Third = delBegin(Third);
+									}
+								}
+								Child->IsEnd3 = true;
+							} 
+							else if(num == 4) 
+							{
+								struct List *Fourth = NULL;
+								int fs4 = Child->count4;
+								if(sem_wait(main_sem) == 0) Fourth = FindeFile(Way4, Fourth, &fs4);
+								else printf("\n sem_wait %s",strerror(errno));
+								Child->count4 = fs4;
+								printf("\ncount4 = %d ps = %d\n",Child->count4, fs4);
+								while (Fourth!=NULL)
+								{
+									if(!Child->IsSet4)
+									{
+										strcpy(Child->Out4,Fourth->file);
+										Child->IsSet4 = true;
+										Fourth = delBegin(Fourth);
+									}
+								}
+								Child->IsEnd4 = true;
+							}
+							if(sem_post(main_sem)!=0) printf("\n sem_post in parent %s\n", strerror(errno));
+							
+							Child->ps--;
+							return 0; 
+						}
 					}
-					else
+					//Общее количество файлов для вывода
+					count += Child->count1+Child->count2+Child->count3+Child->count4;
+					if(sem_post(main_sem)!=0) printf("\n422 sem_post in parent %s\n", strerror(errno));
+					//Все освобождаем
+					if (sem_close(main_sem) != 0)
 					{
-						printf("\n380 sem_wait %s",strerror(errno));
+						printf("\n426 sem_close %s\n",strerror(errno));
 					}
-
 
 				}
 				else
 				{
-					printf("\n387 sem_open %s\n",strerror(errno));
+					printf("\n432 sem_open %s\n",strerror(errno));
 				}
 
 				//Все освобождаем
-				if(munmap(adr, SIZE_STRUCT) != 0&&(pid>0)) printf("\n391 munmap = %s", strerror(errno));
-				if(close(Space) != 0&&(pid>0))printf("\n392 close = %s", strerror(errno));
-				if(shm_unlink(SHMNAME)&&(pid>0))printf("\n393 unlink = %s PID = %d", strerror(errno), pid);
+				if(munmap(adr, SIZE_STRUCT) != 0) printf("\n munmap = %s", strerror(errno));
+				if(close(Space) != 0)printf("\n close = %s", strerror(errno));
+				if(shm_unlink(SHMNAME))printf("\n unlink = %s", strerror(errno));
 
 			}
 			else
 			{
-				printf("\n398 mmap %s\n",strerror(errno));
+				printf("\n mmap %s\n",strerror(errno));
 			}
 
 		}
 		else
 		{
-			printf("\n404 mmap %s\n",strerror(errno));
+			printf("\n mmap %s\n",strerror(errno));
 		}
 
 	}
 	printf("\n COUNT = %d\n", count);
 	return 0;
 }
-
-/*
-							if(ChoisePid(num, pid1, pid2 , pid3, pid4) > 0)
-							{
-								printf("\nHello\n");
-								while (Head != NULL)
-								{
-									if((pid1 > 0)&&(Child->forkFlag1)){ StartChild(pid1,status, &Child->forkFlag1);}
-									else if((pid2 > 0)&&(Child->forkFlag2)){ StartChild(pid2,status, &Child->forkFlag2);}
-									else if((pid3 > 0)&&(Child->forkFlag3)){ StartChild(pid3,status, &Child->forkFlag3);}
-									else if((pid4 > 0)&&(Child->forkFlag4)){ StartChild(pid4,status, &Child->forkFlag4);}
-									if(Child->IsNameSet)
-									{
-										Head = addFilename(Head, Child->Name);
-										Child->IsNameSet = false;
-									}
-									Head = delBegin(Head);
-								}
-
-							}
-
-*/
